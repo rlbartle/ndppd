@@ -590,7 +590,7 @@ ssize_t nd_iface_send_na(nd_iface_t *iface, const nd_addr_t *dst, const nd_lladd
     if (router)
         msg.na.nd_na_flags_reserved |= ND_NA_FLAG_ROUTER;
 
-    nd_log_info("Write NA tgt=%s [%s], dst=%s [%s(%s)]", //
+    nd_log_trace("Write NA tgt=%s [%s], dst=%s [%s(%s)]", //
                 nd_ntoa(tgt), nd_ll_ntoa(tgt_ll), nd_ntoa(dst), nd_ll_ntoa(dst_ll), iface->name);
 
     return ndL_send_icmp6(iface, (ndL_ip6_msg_t *)&msg, sizeof(msg), dst_ll);
