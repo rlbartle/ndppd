@@ -1,14 +1,12 @@
 # NDPPD
 
-This is the development branch for version 1.0 of *ndppd*.
+This is version 1.0 of *ndppd*.
 
 Please read the manpages [ndppd.conf.5](ndppd.conf.5.adoc) and [ndppd.8](ndppd.8.adoc). 
 
 ## Status
 
 ***ndppd*** was rewritten from scratch using C (C99).
-
-It's currently **highly experimental**, but I expect a beta to be ready by the end of the year.
 
 ## Description
 
