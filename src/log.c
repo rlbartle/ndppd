@@ -67,14 +67,14 @@ void nd_log_printf(nd_loglevel_t level, const char *fmt, ...)
     } else {
         const char *names[] = { "error", "info", "debug", "trace" };
 
-        time_t time = nd_current_time / 1000;
+        time_t time = (time_t)(nd_current_time / 1000);
 
         struct tm tm;
         localtime_r(&time, &tm);
 
         char time_buf[32];
-        strftime(time_buf, sizeof(time_buf), "%F %T", &tm);
+        strftime(time_buf, sizeof(time_buf), "%b %e %T", &tm);
 
-        printf("%s.%03ld | %-8s | %s\n", time_buf, nd_current_time % 1000, names[level], buf);
+        printf("%s.%03ld | %-8s | %s\n", time_buf, (time_t)(nd_current_time % 1000), names[level], buf);
     }
 }

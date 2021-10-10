@@ -74,7 +74,7 @@ void nd_session_handle_ns(nd_session_t *session, const nd_addr_t *src, const nd_
         nd_sub_t *sub;
         ND_LL_SEARCH(session->subs, sub, next, nd_addr_eq(&sub->addr, src) && nd_lladdr_eq(&sub->lladdr, src_ll));
 
-        if (!sub) {
+        if (!sub && src_ll) {
             sub = ND_NEW(nd_sub_t);
             sub->addr = *src;
             sub->lladdr = *src_ll;

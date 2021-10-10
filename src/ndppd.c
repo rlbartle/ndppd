@@ -38,10 +38,10 @@
 #include "ndppd.h"
 
 #ifndef NDPPD_CONFIG_PATH
-#    define NDPPD_CONFIG_PATH "../ndppd.conf"
+#    define NDPPD_CONFIG_PATH "/etc/ndppd.conf"
 #endif
 
-long nd_current_time;
+int64_t nd_current_time;
 bool nd_daemonized;
 
 bool nd_opt_daemonize;
@@ -216,7 +216,7 @@ int main(int argc, char *argv[])
 
     struct timeval t1;
     gettimeofday(&t1, 0);
-    nd_current_time = t1.tv_sec * 1000 + t1.tv_usec / 1000;
+    nd_current_time = ((int64_t)t1.tv_sec * 1000) + (int64_t)(t1.tv_usec / 1000);
 
     nd_log_info("ndppd " NDPPD_VERSION);
 
@@ -253,7 +253,7 @@ int main(int argc, char *argv[])
     nd_rt_query_routes();
     bool querying_routes = true;
 
-    long last_session_update = 0;
+    int64_t last_session_update = 0;
 
     for (;;) {
         if (nd_current_time >= nd_rt_dump_timeout)
@@ -276,7 +276,7 @@ int main(int argc, char *argv[])
         }
 
         gettimeofday(&t1, 0);
-        nd_current_time = t1.tv_sec * 1000 + t1.tv_usec / 1000;
+        nd_current_time = ((int64_t)t1.tv_sec * 1000) + (int64_t)(t1.tv_usec / 1000);
     }
 
     return 0;

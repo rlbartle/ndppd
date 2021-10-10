@@ -48,7 +48,7 @@ static nd_rt_route_t *ndL_routes;
 // All IPv6 addresses on the system.
 static nd_rt_addr_t *ndL_addrs;
 
-long nd_rt_dump_timeout;
+int64_t nd_rt_dump_timeout;
 
 static void ndL_new_route(nd_rt_route_t *route)
 {

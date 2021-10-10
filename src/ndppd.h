@@ -24,7 +24,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define NDPPD_VERSION "1.0-beta1"
+#define NDPPD_VERSION "1.0"
 
 /*
  * Types.
@@ -107,9 +107,9 @@ struct nd_session {
     nd_addr_t tgt;        /* Target address. */
     nd_addr_t tgt_r;      /* Rewritten target address. */
     int ons_count;        /* Number of outgoing NS messages. */
-    long ons_time;        /* Last time we sent a NS message. */
-    long ins_time;        /* Last time this session was the target of an incoming NS. */
-    long state_time;      /* Time when session entered it's current state. */
+    int64_t ons_time;     /* Last time we sent a NS message. */
+    int64_t ins_time;     /* Last time this session was the target of an incoming NS. */
+    int64_t state_time;   /* Time when session entered it's current state. */
     nd_state_t state;
     nd_iface_t *iface;
     nd_sub_t *subs;
@@ -242,7 +242,7 @@ struct nd_io {
  * ndppd.c
  */
 
-extern long nd_current_time;
+extern int64_t nd_current_time;
 extern bool nd_daemonized;
 extern bool nd_opt_syslog;
 extern bool nd_opt_daemonize;
@@ -379,7 +379,7 @@ void nd_log_printf(nd_loglevel_t level, const char *fmt, ...);
  * rt.c
  */
 
-extern long nd_rt_dump_timeout;
+extern int64_t nd_rt_dump_timeout;
 
 bool nd_rt_open();
 void nd_rt_cleanup();
