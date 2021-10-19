@@ -19,6 +19,7 @@
 #include <string.h>
 
 #include "ndppd.h"
+#include <netinet/in.h>
 
 extern int nd_conf_invalid_ttl;
 extern int nd_conf_valid_ttl;
@@ -54,6 +55,10 @@ static void ndL_up(nd_session_t *session)
 
 static void ndL_down(nd_session_t *session)
 {
+    if (IN6_IS_ADDR_LINKLOCAL(&session->tgt)) {
+        return;
+    }
+
     if (session->iface && session->autowired) {
         nd_rt_remove_route(&session->tgt, 128, session->rule->table);
         session->autowired = false;
