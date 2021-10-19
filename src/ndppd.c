@@ -187,7 +187,7 @@ int main(int argc, char *argv[])
             break;
 
         case 'v':
-            if (nd_opt_verbosity < ND_LOG_ERROR)
+            if (nd_opt_verbosity < ND_LOG_TRACE)
                 nd_opt_verbosity++;
             break;
 
