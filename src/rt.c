@@ -263,15 +263,11 @@ static void ndL_io_handler(__attribute__((unused)) nd_io_t *unused1, __attribute
             if (hdr->nlmsg_type == NLMSG_DONE) {
                 nd_rt_dump_timeout = 0;
                 break;
-            }
-
-            if (hdr->nlmsg_type == NLMSG_ERROR) {
+            } else if (hdr->nlmsg_type == NLMSG_ERROR) {
                 struct nlmsgerr *e = (struct nlmsgerr *)NLMSG_DATA(hdr);
                 nd_log_error("rt: Netlink: %s (%d)", strerror(-e->error), e->msg.nlmsg_type);
                 continue;
-            }
-
-            if (hdr->nlmsg_type == RTM_NEWROUTE) {
+            } else if (hdr->nlmsg_type == RTM_NEWROUTE) {
                 ndL_handle_newroute((struct rtmsg *)NLMSG_DATA(hdr), RTM_PAYLOAD(hdr));
             } else if (hdr->nlmsg_type == RTM_DELROUTE) {
                 ndL_handle_delroute((struct rtmsg *)NLMSG_DATA(hdr), RTM_PAYLOAD(hdr));
@@ -685,6 +681,7 @@ bool nd_rt_add_neigh(nd_addr_t *dst, unsigned oif)
         .hdr.nlmsg_flags = NLM_F_REQUEST,
         .hdr.nlmsg_len = sizeof(req),
         .msg.ndm_family = AF_INET6,
+        .msg.ndm_type = RTN_UNICAST,
         .msg.ndm_state = NUD_PERMANENT,
         .msg.ndm_flags = NTF_PROXY,
         .msg.ndm_ifindex = oif,
@@ -710,6 +707,7 @@ bool nd_rt_remove_neigh(nd_addr_t *dst, unsigned oif)
         .hdr.nlmsg_flags = NLM_F_REQUEST,
         .hdr.nlmsg_len = sizeof(req),
         .msg.ndm_family = AF_INET6,
+        .msg.ndm_type = RTN_UNICAST,
         .msg.ndm_state = NUD_PERMANENT,
         .msg.ndm_flags = NTF_PROXY,
         .msg.ndm_ifindex = oif,
