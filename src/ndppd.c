@@ -168,17 +168,19 @@ int main(int argc, char *argv[])
         { "config", 1, 0, 'c' },  //
         { "daemon", 0, 0, 'd' },  //
         { "verbose", 0, 0, 'v' }, //
-        { "syslog", 0, 0, 1 },    //
+        { "syslog", 0, 0, 's' },  //
         { "pidfile", 1, 0, 'p' }, //
 #ifdef __linux__
-        { "netns", 1, 0, 2 },
+        { "netns", 1, 0, 1 },
 #endif
         { NULL, 0, 0, 0 },
     };
 
-    for (int ch; (ch = getopt_long(argc, argv, "c:dp:v", long_options, NULL)) != -1;) {
+    bool help = false;
+    for (int ch; (ch = getopt_long(argc, argv, "c:dp:vs", long_options, NULL)) != -1;) {
         switch (ch) {
         case 'c':
+            if (nd_opt_config_path) free(nd_opt_config_path);
             nd_opt_config_path = nd_strdup(optarg);
             break;
 
@@ -192,26 +194,31 @@ int main(int argc, char *argv[])
             break;
 
         case 'p':
+            if (nd_opt_pidfile_path) free(nd_opt_pidfile_path);
             nd_opt_pidfile_path = nd_strdup(optarg);
             break;
 
-        case 1:
+        case 's':
             nd_opt_syslog = true;
             break;
 
 #ifdef __linux__
-        case 2:
-            if (netns) {
-                fprintf(stderr, "--netns can only be specified once");
-                return -1;
-            }
+        case 1:
+            if (netns) free(netns);
             netns = nd_strdup(optarg);
             break;
 #endif
 
         default:
+            help = true;
             break;
         }
+    }
+    
+    if (help) {
+        printf("ndppd: NDP proxy daemon, version %s.\n", NDPPD_VERSION);
+        printf("Usage: ndppd [--config -c cfgfile_path] [--pidfile -p pidfile_path] [--daemon -d] [--verbose -v] [--syslog -s]\n");
+        return 0;
     }
 
     struct timeval t1;

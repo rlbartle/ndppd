@@ -148,7 +148,7 @@ struct nd_iface {
     char name[IF_NAMESIZE];
     nd_lladdr_t lladdr;
 
-    uint index;
+    uint32_t index;
 
     nd_proxy_t *proxy;
 

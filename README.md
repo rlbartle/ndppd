@@ -34,7 +34,7 @@ In most cases, the following should be sufficient:
 
     make all && make install
 
-## Contact
+## Original Author
 
 Daniel Adolfsson <daniel-at-ashen.se>  
 https://github.com/DanielAdolfsson/ndppd

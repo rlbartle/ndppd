@@ -570,6 +570,8 @@ bool nd_rt_add_route(nd_addr_t *dst, unsigned pflen, unsigned oif, unsigned tabl
 
     struct sockaddr_nl addr = { .nl_family = AF_NETLINK };
 
+    nd_log_debug("rt: Adding route %s/%d table %d", nd_ntoa(dst), pflen, table);
+
     return nd_io_send(ndL_io, (struct sockaddr *)&addr, sizeof(addr), &req, sizeof(req)) >= 0;
 #else
     struct {
@@ -600,7 +602,7 @@ bool nd_rt_add_route(nd_addr_t *dst, unsigned pflen, unsigned oif, unsigned tabl
 
     nd_mask_from_pflen(pflen, (nd_addr_t *)&msg.mask.sin6_addr);
 
-    nd_log_info("rt: Adding route %s/%d table %d", nd_ntoa(dst), pflen, table);
+    nd_log_debug("rt: Adding route %s/%d table %d", nd_ntoa(dst), pflen, table);
 
     return nd_io_write(ndL_io, &msg, sizeof(msg)) >= 0;
 #endif
@@ -630,6 +632,8 @@ bool nd_rt_remove_route(nd_addr_t *dst, unsigned pflen, unsigned table)
 
     struct sockaddr_nl addr = { .nl_family = AF_NETLINK };
 
+    nd_log_debug("rt: Removing route %s/%d table %d", nd_ntoa(dst), pflen, table);
+
     return nd_io_send(ndL_io, (struct sockaddr *)&addr, sizeof(addr), &req, sizeof(req)) >= 0;
 #else
     struct __attribute__((packed)) {
@@ -654,7 +658,7 @@ bool nd_rt_remove_route(nd_addr_t *dst, unsigned pflen, unsigned table)
 
     nd_mask_from_pflen(pflen, (nd_addr_t *)&req.mask.sin6_addr);
 
-    nd_log_info("rt: Removing route %s/%d table %d", nd_ntoa(dst), pflen, table);
+    nd_log_debug("rt: Removing route %s/%d table %d", nd_ntoa(dst), pflen, table);
 
     return nd_io_write(ndL_io, &req, sizeof(req)) >= 0;
 #endif

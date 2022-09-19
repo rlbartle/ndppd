@@ -43,10 +43,6 @@
 
 #include "ndppd.h"
 
-#ifdef __clang__
-#    pragma clang diagnostic ignored "-Waddress-of-packed-member"
-#endif
-
 extern int nd_conf_invalid_ttl;
 extern int nd_conf_valid_ttl;
 extern int nd_conf_renew;
@@ -196,6 +192,8 @@ static void ndL_handle_msg(nd_iface_t *iface, ndL_ip6_msg_t *msg)
     struct icmp6_hdr *ih = (struct icmp6_hdr *)((void *)(msg + 1) + i);
     uint16_t ilen = plen - i;
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Waddress-of-packed-member"
     if (ndL_calculate_icmp6_checksum(&msg->ip6h, ih, ilen) != ih->icmp6_cksum)
         return;
 
@@ -207,6 +205,7 @@ static void ndL_handle_msg(nd_iface_t *iface, ndL_ip6_msg_t *msg)
         ndL_handle_mlq(iface);
     else if (ih->icmp6_type == MLD_LISTENER_REPORT)
         ndL_handle_mlr(iface);
+#pragma GCC diagnostic pop
 }
 
 #ifdef __linux__
@@ -546,7 +545,10 @@ static ssize_t ndL_send_icmp6(nd_iface_t *iface, ndL_ip6_msg_t *msg, size_t size
 
     struct icmp6_hdr *icmp6_hdr = (struct icmp6_hdr *)(msg + 1);
     uint16_t icmp6_len = size - sizeof(ndL_ip6_msg_t);
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Waddress-of-packed-member"
     icmp6_hdr->icmp6_cksum = ndL_calculate_icmp6_checksum(&msg->ip6h, icmp6_hdr, icmp6_len);
+#pragma GCC diagnostic pop
 
 #ifdef __linux__
     struct sockaddr_ll ll = {
