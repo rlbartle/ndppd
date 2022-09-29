@@ -6,7 +6,7 @@ Daniel Adolfsson <daniel@ashen.se>
 ndppd - neighbor advertisement proxy daemon for IPv6
 
 == Synopsis
-*ndppd* [ *-dv* ] [ *-c* _config_file_ ] [ *-p* _pid_file_ ] [ *--syslog* ]
+*ndppd* [ *-dvs* ] [ *-c* _config_file_ ] [ *-p* _pid_file_ ]
 
 == Description
 *ndppd* is a neighbor advertisement proxy daemon; it allows a host to proxy neighbor discovery
@@ -28,9 +28,9 @@ Default: /etc/ndppd.conf
     specified file and write the PID of the newly spawned child to it. The file remains locked until the
     child terminates.
 
-*--syslog*::
+*-s*, *--syslog*::
     Force the use of syslog even if *ndppd* is not running as a daemon.
 
-*-v*::
+*-v*, *--verbose*::
     Increase the verbosity of the logging. Multiple *-v* increases the verbosity even further.
 

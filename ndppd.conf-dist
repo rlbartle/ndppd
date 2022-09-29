@@ -6,14 +6,11 @@
 # valid-ttl <milliseconds>
 #valid-ttl 30000
 
-# renew <milliseconds>
-#renew 5000
-
 # retransmit-limit <count>
 #retransmit-limit 3
 
 # retransmit-time <milliseconds>
-#retransmit-time 1000
+#retransmit-time 1500
 
 # keepalive <yes|no>
 #keepalive yes

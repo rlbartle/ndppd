@@ -22,14 +22,6 @@
 
 static nd_proxy_t *ndL_proxies;
 
-extern int nd_conf_invalid_ttl;
-extern int nd_conf_valid_ttl;
-extern int nd_conf_stale_ttl;
-extern int nd_conf_renew;
-extern int nd_conf_retrans_limit;
-extern int nd_conf_retrans_time;
-extern bool nd_conf_keepalive;
-
 nd_proxy_t *nd_proxy_create(const char *ifname)
 {
     nd_proxy_t *proxy;
@@ -55,20 +47,19 @@ void nd_proxy_handle_ns(nd_proxy_t *proxy, const nd_addr_t *src, const nd_addr_t
                         const nd_lladdr_t *src_ll)
 {
     (void)dst;
-
-    nd_log_trace("Handle NS src=%s [%s], dst=%s, tgt=%s", //
-                 nd_ntoa(src), nd_ll_ntoa(src_ll), nd_ntoa(dst), nd_ntoa(tgt));
-
     nd_session_t *session = nd_session_find(tgt, proxy);
 
-    if (!session) {
-        nd_rule_t *rule;
-        ND_LL_SEARCH(proxy->rules, rule, next, nd_addr_match(&rule->addr, tgt, rule->prefix));
+    nd_log_trace("Handle NS%s src=%s [%s(%s)], dst=%s, tgt=%s", !session ? " (NEW)" : "", //
+                 nd_ntoa(src), nd_ll_ntoa(src_ll), proxy->ifname, nd_ntoa(dst), nd_ntoa(tgt));
 
+    nd_rule_t *rule;
+    ND_LL_SEARCH(proxy->rules, rule, next, nd_addr_match(&rule->addr, tgt, rule->prefix));
+    if (!session) {
         if (!rule)
             return;
-
         session = nd_session_create(rule, tgt);
+    } else if (rule && rule->mode != ND_MODE_AUTO && session->iface) {
+        nd_iface_send_ns(session->iface, &session->tgt_r);
     }
 
     nd_session_handle_ns(session, src, src_ll);

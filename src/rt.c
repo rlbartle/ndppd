@@ -35,10 +35,6 @@
 
 #include "ndppd.h"
 
-#ifdef __clang__
-#    pragma clang diagnostic ignored "-Waddress-of-packed-member"
-#endif
-
 // Our AF_ROUTE or AF_NETLINK socket.
 static nd_io_t *ndL_io;
 
@@ -265,7 +261,10 @@ static void ndL_io_handler(__attribute__((unused)) nd_io_t *unused1, __attribute
                 break;
             } else if (hdr->nlmsg_type == NLMSG_ERROR) {
                 struct nlmsgerr *e = (struct nlmsgerr *)NLMSG_DATA(hdr);
-                nd_log_error("rt: Netlink: %s (%d)", strerror(-e->error), e->msg.nlmsg_type);
+                //Suppress "File exists" and "No such file or directory" error messages when not logging debug messages.
+                //These errors frequently occur when adding and removing routes and aren't very important.
+                if (nd_opt_verbosity >= ND_LOG_DEBUG || (e->error != -EEXIST && e->error != -ENOENT))
+                    nd_log_error("rt: Netlink: %s (%d)", strerror(-e->error), e->msg.nlmsg_type);
                 continue;
             } else if (hdr->nlmsg_type == RTM_NEWROUTE) {
                 ndL_handle_newroute((struct rtmsg *)NLMSG_DATA(hdr), RTM_PAYLOAD(hdr));

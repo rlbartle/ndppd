@@ -1,7 +1,7 @@
 ifdef DEBUG
 CFLAGS  ?= -g -DDEBUG
 else
-CFLAGS  ?= -Os
+CFLAGS  ?= -Os -flto -DNDEBUG
 LDFLAGS ?= -s -w
 endif
 
@@ -12,7 +12,7 @@ MANDIR      ?= ${DESTDIR}${PREFIX}/share/man
 SBINDIR     ?= ${DESTDIR}${PREFIX}/sbin
 ASCIIDOCTOR ?= /usr/bin/asciidoctor
 
-CFLAGS := ${CFLAGS} -Werror -Wall -Wextra -Wno-missing-braces -Wno-missing-field-initializers
+CFLAGS := ${CFLAGS} -Werror -Wall -Wextra -Wno-missing-braces -Wno-missing-field-initializers -Wno-address-of-packed-member
 
 OBJS = $(patsubst %.c,%.o,$(wildcard src/*.c))
 

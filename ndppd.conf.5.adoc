@@ -61,7 +61,7 @@ Default: 5000
 *retrans-time* _milliseconds_::
     The time *ndppd* will wait before sending another _neighbor solicitation_ to the internal interface.
 +
-Default: 1000
+Default: 1500
 
 *retrans-limit* _count_::
     How many times *ndppd* attempt to send _neighbor solicitation_ messages, and not receiving a valid _neighbor advertisement_ response,

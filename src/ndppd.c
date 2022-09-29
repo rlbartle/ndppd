@@ -28,7 +28,7 @@
 #include <string.h>
 #include <sys/file.h>
 #include <sys/stat.h>
-#include <sys/time.h>
+#include <time.h>
 #include <unistd.h>
 
 #ifdef __linux__
@@ -165,11 +165,12 @@ int main(int argc, char *argv[])
 #endif
 
     static struct option long_options[] = {
-        { "config", 1, 0, 'c' },  //
-        { "daemon", 0, 0, 'd' },  //
-        { "verbose", 0, 0, 'v' }, //
-        { "syslog", 0, 0, 's' },  //
-        { "pidfile", 1, 0, 'p' }, //
+        { "config", 1, 0, 'c' },
+        { "daemon", 0, 0, 'd' },
+        { "help", 0, 0, 0 },
+        { "verbose", 0, 0, 'v' },
+        { "syslog", 0, 0, 's' },
+        { "pidfile", 1, 0, 'p' },
 #ifdef __linux__
         { "netns", 1, 0, 1 },
 #endif
@@ -177,7 +178,7 @@ int main(int argc, char *argv[])
     };
 
     bool help = false;
-    for (int ch; (ch = getopt_long(argc, argv, "c:dp:vs", long_options, NULL)) != -1;) {
+    for (int ch; (ch = getopt_long(argc, argv, "c:dhvsp:", long_options, NULL)) != -1;) {
         switch (ch) {
         case 'c':
             if (nd_opt_config_path) free(nd_opt_config_path);
@@ -214,16 +215,16 @@ int main(int argc, char *argv[])
             break;
         }
     }
-    
+
     if (help) {
         printf("ndppd: NDP proxy daemon, version %s.\n", NDPPD_VERSION);
         printf("Usage: ndppd [--config -c cfgfile_path] [--pidfile -p pidfile_path] [--daemon -d] [--verbose -v] [--syslog -s]\n");
         return 0;
     }
 
-    struct timeval t1;
-    gettimeofday(&t1, 0);
-    nd_current_time = ((int64_t)t1.tv_sec * 1000) + (int64_t)(t1.tv_usec / 1000);
+    struct timespec t;
+    clock_gettime(CLOCK_MONOTONIC_COARSE, &t);
+    nd_current_time = ((int64_t)t.tv_sec * 1000) + (int64_t)(t.tv_nsec / 1000000);
 
     nd_log_info("ndppd " NDPPD_VERSION);
 
@@ -282,8 +283,8 @@ int main(int argc, char *argv[])
             break;
         }
 
-        gettimeofday(&t1, 0);
-        nd_current_time = ((int64_t)t1.tv_sec * 1000) + (int64_t)(t1.tv_usec / 1000);
+        clock_gettime(CLOCK_MONOTONIC_COARSE, &t);
+        nd_current_time = ((int64_t)t.tv_sec * 1000) + (int64_t)(t.tv_nsec / 1000000);
     }
 
     return 0;

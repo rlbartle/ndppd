@@ -109,11 +109,11 @@ struct nd_session {
     int ons_count;        /* Number of outgoing NS messages. */
     int64_t ons_time;     /* Last time we sent a NS message. */
     int64_t ins_time;     /* Last time this session was the target of an incoming NS. */
-    int64_t state_time;   /* Time when session entered it's current state. */
+    int64_t state_time;   /* Time when session entered its current state. */
     nd_state_t state;
     nd_iface_t *iface;
     nd_sub_t *subs;
-    bool autowired; /* If this session had a route set up. */
+    bool autowired;       /* If this session had a route set up. */
 };
 
 struct nd_sub {
@@ -134,11 +134,11 @@ struct nd_rule {
 
     nd_addr_t rewrite_tgt;
     int rewrite_pflen;
-
-    nd_iface_t *iface;
-    bool autowire;
+    
     int table;
     nd_mode_t mode;
+    nd_iface_t *iface;
+    bool autowire;
 };
 
 struct nd_iface {
@@ -360,20 +360,28 @@ ssize_t nd_io_write(nd_io_t *io, void *buf, size_t count);
  * log.h
  */
 
+#if defined(NDEBUG) && !defined(NDPPD_NO_DEBUG)
+#    define NDPPD_NO_DEBUG
+#endif
+
 extern nd_loglevel_t nd_opt_verbosity;
 extern bool nd_opt_syslog;
 
 void nd_log_printf(nd_loglevel_t level, const char *fmt, ...);
 
-#ifdef NDPPD_NO_TRACE
-#    define nd_log_trace(fmt, ...) (void)
-#else
-#    define nd_log_trace(fmt, ...) nd_log_printf(ND_LOG_TRACE, fmt, ##__VA_ARGS__)
-#endif
-
 #define nd_log_error(fmt, ...) nd_log_printf(ND_LOG_ERROR, fmt, ##__VA_ARGS__)
 #define nd_log_info(fmt, ...) nd_log_printf(ND_LOG_INFO, fmt, ##__VA_ARGS__)
-#define nd_log_debug(fmt, ...) nd_log_printf(ND_LOG_DEBUG, fmt, ##__VA_ARGS__)
+
+#if defined(NDPPD_NO_DEBUG)
+#    define nd_log_debug(fmt, ...) (void)0
+#    define nd_log_trace(fmt, ...) (void)0
+#elif defined(NDPPD_NO_TRACE)
+#    define nd_log_debug(fmt, ...) nd_log_printf(ND_LOG_DEBUG, fmt, ##__VA_ARGS__)
+#    define nd_log_trace(fmt, ...) (void)0
+#else
+#    define nd_log_debug(fmt, ...) nd_log_printf(ND_LOG_DEBUG, fmt, ##__VA_ARGS__)
+#    define nd_log_trace(fmt, ...) nd_log_printf(ND_LOG_TRACE, fmt, ##__VA_ARGS__)
+#endif
 
 /*
  * rt.c

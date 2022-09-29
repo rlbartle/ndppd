@@ -67,14 +67,15 @@ void nd_log_printf(nd_loglevel_t level, const char *fmt, ...)
     } else {
         const char *names[] = { "error", "info", "debug", "trace" };
 
-        time_t time = (time_t)(nd_current_time / 1000);
+        struct timespec t;
+        clock_gettime(CLOCK_REALTIME_COARSE, &t);
 
         struct tm tm;
-        localtime_r(&time, &tm);
+        localtime_r(&t.tv_sec, &tm);
 
         char time_buf[32];
         strftime(time_buf, sizeof(time_buf), "%b %e %T", &tm);
 
-        printf("%s.%.3d | %s | %s\n", time_buf, (int)(nd_current_time % 1000), names[level], buf);
+        printf("%s.%.3d | %s | %s\n", time_buf, (int)(t.tv_nsec / 1000000), names[level], buf);
     }
 }

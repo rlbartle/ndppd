@@ -30,7 +30,6 @@
 
 #ifdef __linux__
 #    include <linux/filter.h>
-#    include <linux/if_ether.h>
 #    include <linux/if_packet.h>
 #    include <netinet/if_ether.h>
 #else
@@ -43,13 +42,6 @@
 
 #include "ndppd.h"
 
-extern int nd_conf_invalid_ttl;
-extern int nd_conf_valid_ttl;
-extern int nd_conf_renew;
-extern int nd_conf_retrans_limit;
-extern int nd_conf_retrans_time;
-extern bool nd_conf_keepalive;
-
 static nd_iface_t *ndL_first_iface;
 static nd_io_t *ndL_io;
 
@@ -61,7 +53,7 @@ typedef struct __attribute__((packed)) {
     struct ip6_hdr ip6h;
 } ndL_ip6_msg_t;
 
-static void ndL_handle_ns(nd_iface_t *iface, struct ip6_hdr *ip6h, struct icmp6_hdr *ih, size_t len)
+static void ndL_handle_ns(nd_iface_t *iface, struct ip6_hdr *ip6h, struct icmp6_hdr *ih, size_t len, bool from_host)
 {
     if (!iface->proxy)
         return;
@@ -74,8 +66,9 @@ static void ndL_handle_ns(nd_iface_t *iface, struct ip6_hdr *ip6h, struct icmp6_
     nd_lladdr_t *src_ll = NULL;
 
     if (!nd_addr_is_unspecified((nd_addr_t *)&ip6h->ip6_src)) {
-        // FIXME: Source link-layer address MUST be included in multicast solicitations and SHOULD be included in
-        //        unicast solicitations. [https://tools.ietf.org/html/rfc4861#section-4.3].
+        // Source link-layer address MUST be included in multicast solicitations and SHOULD be included in
+        // unicast solicitations. [https://tools.ietf.org/html/rfc4861#section-4.3]. There are indeed some
+        // unicast solicitations that have been observed to lack it..
 
         if (len - sizeof(struct nd_neighbor_solicit) < 8)
             return;
@@ -88,20 +81,45 @@ static void ndL_handle_ns(nd_iface_t *iface, struct ip6_hdr *ip6h, struct icmp6_
         src_ll = (nd_lladdr_t *)((void *)opt + 2);
     }
 
-    nd_proxy_handle_ns(iface->proxy, (nd_addr_t *)&ip6h->ip6_src, (nd_addr_t *)&ip6h->ip6_dst,
-                       (nd_addr_t *)&ns->nd_ns_target, src_ll);
+    const nd_addr_t *tgt = (nd_addr_t *)&ns->nd_ns_target;
+    if (IN6_IS_ADDR_LINKLOCAL(tgt)) {
+        nd_log_trace("Ignoring NS [%s(%s)] tgt=%s", nd_ll_ntoa(src_ll), iface->proxy->ifname, nd_ntoa(tgt));
+        return;
+    }
+
+    if (from_host) {
+        // Ignore solicitations made by this host if the source interface already has a valid session.
+        // This prevents needlessly relaying messages to the other interface(s) when it is already 
+        // resolved on the current interface.
+        nd_iface_t *other_iface;
+        nd_session_t *session;
+        ND_LL_SEARCH(ndL_first_iface, other_iface, next, other_iface != iface && 
+            (session = nd_session_find(tgt, other_iface->proxy)) && session->state == ND_STATE_VALID);
+        if (other_iface) {
+            nd_log_trace("Ignoring NS [%s(%s)] tgt=%s", nd_ll_ntoa(src_ll), iface->proxy->ifname, nd_ntoa(tgt));
+            return;
+        }
+    }
+
+    nd_proxy_handle_ns(iface->proxy, (nd_addr_t *)&ip6h->ip6_src, (nd_addr_t *)&ip6h->ip6_dst, tgt, src_ll);
 }
 
-static void ndL_handle_na(nd_iface_t *iface, struct icmp6_hdr *ih, size_t len)
+static void ndL_handle_na(nd_iface_t *iface, struct ip6_hdr *ip6h, struct icmp6_hdr *ih, size_t len, const nd_lladdr_t *src_ll, bool from_host)
 {
+    (void)ip6h;
+    (void)src_ll;
+    (void)from_host;
     if (len < sizeof(struct nd_neighbor_advert))
         return;
 
     struct nd_neighbor_advert *na = (struct nd_neighbor_advert *)ih;
+    const nd_addr_t *tgt = (nd_addr_t *)&na->nd_na_target;
+    if (IN6_IS_ADDR_LINKLOCAL(tgt))
+        return;
 
-    nd_log_trace("Handle NA tgt=%s", nd_ntoa((nd_addr_t *)&na->nd_na_target));
+    nd_log_trace("Handle NA [%s(%s)] tgt=%s", nd_ll_ntoa(src_ll), iface->proxy ? iface->proxy->ifname : "", nd_ntoa(tgt));
 
-    nd_session_t *session = nd_session_find_r((nd_addr_t *)&na->nd_na_target, iface);
+    nd_session_t *session = nd_session_find_r(tgt, iface);
 
     if (!session)
         return;
@@ -112,13 +130,13 @@ static void ndL_handle_na(nd_iface_t *iface, struct icmp6_hdr *ih, size_t len)
 static void ndL_handle_mlq(nd_iface_t *iface)
 {
     (void)iface;
-    nd_log_error("(mlq) in");
+    nd_log_debug("Handle MLQ [%s]", iface->proxy ? iface->proxy->ifname : "");
 }
 
 static void ndL_handle_mlr(nd_iface_t *iface)
 {
     (void)iface;
-    nd_log_error("(mlr) in");
+    nd_log_debug("Handle MLR [%s]", iface->proxy ? iface->proxy->ifname : "");
 }
 
 static uint16_t ndL_calculate_checksum(uint32_t sum, const void *data, size_t length)
@@ -158,15 +176,13 @@ static uint16_t ndL_calculate_icmp6_checksum(struct ip6_hdr *ip6_hdr, struct icm
     };
 
     hdr.icmp6_hdr.icmp6_cksum = 0;
+    hdr.icmp6_hdr.icmp6_cksum = ndL_calculate_checksum(0xffff, &hdr, sizeof(hdr));
+    hdr.icmp6_hdr.icmp6_cksum = ndL_calculate_checksum(hdr.icmp6_hdr.icmp6_cksum, icmp6_hdr + 1, size - sizeof(struct icmp6_hdr));
 
-    uint16_t sum;
-    sum = ndL_calculate_checksum(0xffff, &hdr, sizeof(hdr));
-    sum = ndL_calculate_checksum(sum, icmp6_hdr + 1, size - sizeof(struct icmp6_hdr));
-
-    return htons(~sum);
+    return htons(~hdr.icmp6_hdr.icmp6_cksum);
 }
 
-static void ndL_handle_msg(nd_iface_t *iface, ndL_ip6_msg_t *msg)
+static void ndL_handle_msg(nd_iface_t *iface, ndL_ip6_msg_t *msg, bool from_host)
 {
     size_t plen = ntohs(msg->ip6h.ip6_plen);
     size_t i = 0;
@@ -192,20 +208,17 @@ static void ndL_handle_msg(nd_iface_t *iface, ndL_ip6_msg_t *msg)
     struct icmp6_hdr *ih = (struct icmp6_hdr *)((void *)(msg + 1) + i);
     uint16_t ilen = plen - i;
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Waddress-of-packed-member"
     if (ndL_calculate_icmp6_checksum(&msg->ip6h, ih, ilen) != ih->icmp6_cksum)
         return;
 
     if (ih->icmp6_type == ND_NEIGHBOR_SOLICIT)
-        ndL_handle_ns(iface, &msg->ip6h, ih, ilen);
+        ndL_handle_ns(iface, &msg->ip6h, ih, ilen, from_host);
     else if (ih->icmp6_type == ND_NEIGHBOR_ADVERT)
-        ndL_handle_na(iface, ih, ilen);
+        ndL_handle_na(iface, &msg->ip6h, ih, ilen, (nd_lladdr_t *)&msg->eh.ether_shost, from_host);
     else if (ih->icmp6_type == MLD_LISTENER_QUERY)
         ndL_handle_mlq(iface);
     else if (ih->icmp6_type == MLD_LISTENER_REPORT)
         ndL_handle_mlr(iface);
-#pragma GCC diagnostic pop
 }
 
 #ifdef __linux__
@@ -227,10 +240,18 @@ static void ndL_io_handler(nd_io_t *io, __attribute__((unused)) int events)
         if (len < 0)
             return;
 
+        // Normally we would ignore outgoing messages, but due to undesirable NDP behaviour by various
+        // implementations (ie. absent solicitations), it is useful to process them as they can be utilised
+        // to reflect the packets onto the other interface(s). 
+        // The Linux host appears to only send solicitations to one of the interfaces, so by having the
+        // NDP proxy daemon handle any outgoing packets as well works to ensure that the messages are
+        // also relayed to any other relevant interfaces.
+        // -- PACKET_MULTICAST, PACKET_HOST, PACKET_OTHERHOST
+        // if (lladdr.sll_pkttype == PACKET_OUTGOING)
+        //     return;
+
         nd_iface_t *iface;
-
         ND_LL_SEARCH(ndL_first_iface, iface, next, iface->index == (unsigned int)lladdr.sll_ifindex);
-
         if (!iface)
             continue;
 
@@ -245,7 +266,7 @@ static void ndL_io_handler(nd_io_t *io, __attribute__((unused)) int events)
         if (ntohs(msg->ip6h.ip6_plen) != len - sizeof(ndL_ip6_msg_t))
             continue;
 
-        ndL_handle_msg(iface, msg);
+        ndL_handle_msg(iface, msg, lladdr.sll_pkttype == PACKET_OUTGOING);
     }
 }
 #else
@@ -282,7 +303,7 @@ static void ndL_io_handler(nd_io_t *io, __attribute__((unused)) int events)
                 continue;
             }
 
-            ndL_handle_msg((nd_iface_t *)io->data, msg);
+            ndL_handle_msg((nd_iface_t *)io->data, msg, false);
         }
     }
 }
@@ -333,7 +354,7 @@ static bool ndL_configure_filter(nd_io_t *io)
         BPF_STMT(BPF_LD + BPF_B + BPF_IND, offsetof(struct icmp6_hdr, icmp6_type)),
         /* Succeed if A == ND_NEIGHBOR_SOLICIT. */
         BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, ND_NEIGHBOR_SOLICIT, 4, 0),
-        /* Succeed if A == ND_NEIGHBOR_SOLICIT. */
+        /* Succeed if A == ND_NEIGHBOR_ADVERT. */
         BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, ND_NEIGHBOR_ADVERT, 3, 0),
         /* Succeed if A == MLD_LISTENER_QUERY. */
         BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, MLD_LISTENER_QUERY, 2, 0),
@@ -545,10 +566,7 @@ static ssize_t ndL_send_icmp6(nd_iface_t *iface, ndL_ip6_msg_t *msg, size_t size
 
     struct icmp6_hdr *icmp6_hdr = (struct icmp6_hdr *)(msg + 1);
     uint16_t icmp6_len = size - sizeof(ndL_ip6_msg_t);
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Waddress-of-packed-member"
     icmp6_hdr->icmp6_cksum = ndL_calculate_icmp6_checksum(&msg->ip6h, icmp6_hdr, icmp6_len);
-#pragma GCC diagnostic pop
 
 #ifdef __linux__
     struct sockaddr_ll ll = {
@@ -633,7 +651,10 @@ ssize_t nd_iface_send_ns(nd_iface_t *iface, const nd_addr_t *tgt)
 bool nd_iface_startup()
 {
 #ifdef __linux__
-    if (!(ndL_io = nd_io_socket(AF_PACKET, SOCK_RAW, htons(ETH_P_IPV6))))
+    // Use ETH_P_ALL so that locally generated messages are received. This shouldn't be needed, but it seems
+    // somehow the expected solicitations from neighbors are not being generated. To work around that, we can
+    // use the solicitations generated by us to similar effect.
+    if (!(ndL_io = nd_io_socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL))))
         return false;
 
     if (!ndL_configure_filter(ndL_io)) {

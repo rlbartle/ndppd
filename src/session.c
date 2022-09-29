@@ -24,7 +24,6 @@
 extern int nd_conf_invalid_ttl;
 extern int nd_conf_valid_ttl;
 extern int nd_conf_stale_ttl;
-extern int nd_conf_renew;
 extern int nd_conf_retrans_limit;
 extern int nd_conf_retrans_time;
 extern bool nd_conf_keepalive;
@@ -41,13 +40,13 @@ static nd_session_t *ndL_sessions_r[NDPPD_SESSION_BUCKETS];
 
 static void ndL_up(nd_session_t *session)
 {
-    if (session->iface && !session->autowired && session->rule->autowire) {
+    if (!session->autowired && session->iface && session->rule->autowire) {
         nd_rt_add_route(&session->tgt, 128, session->iface->index, session->rule->table);
         session->autowired = true;
     }
 
     if (nd_conf_use_kernel) {
-        nd_log_debug("session [%s] add kernel neighbor proxy for %s", //
+        nd_log_debug("session [%s] adding kernel neighbor proxy for %s", //
                      session->rule->proxy->ifname, nd_ntoa(&session->tgt));
         nd_rt_add_neigh(&session->tgt, session->rule->proxy->iface->index);
     }
@@ -55,11 +54,7 @@ static void ndL_up(nd_session_t *session)
 
 static void ndL_down(nd_session_t *session)
 {
-    if (IN6_IS_ADDR_LINKLOCAL(&session->tgt)) {
-        return;
-    }
-
-    if (session->iface && session->autowired) {
+    if (session->autowired) {
         nd_rt_remove_route(&session->tgt, 128, session->rule->table);
         session->autowired = false;
     }
@@ -104,6 +99,7 @@ void nd_session_handle_ns(nd_session_t *session, const nd_addr_t *src, const nd_
 void nd_session_handle_na(nd_session_t *session)
 {
     if (session->state == ND_STATE_VALID) {
+        session->state_time = nd_current_time;
         return;
     }
 
@@ -118,7 +114,7 @@ void nd_session_handle_na(nd_session_t *session)
     session->subs = NULL;
 
     if (session->state != ND_STATE_VALID) {
-        nd_log_debug("Session [%s] %s -> VALID", session->rule->proxy->ifname, nd_ntoa(&session->tgt));
+        nd_log_debug("session [%s] %s -> VALID", session->rule->proxy->ifname, nd_ntoa(&session->tgt));
 
         ndL_up(session);
         session->state = ND_STATE_VALID;
@@ -132,6 +128,7 @@ nd_session_t *nd_session_create(nd_rule_t *rule, const nd_addr_t *tgt)
 
     *session = (nd_session_t){
         .rule = rule,
+        .state = ND_STATE_INVALID,
         .state_time = nd_current_time,
         .tgt = *tgt,
     };
@@ -143,16 +140,10 @@ nd_session_t *nd_session_create(nd_rule_t *rule, const nd_addr_t *tgt)
 
     if (rule->mode == ND_MODE_AUTO) {
         nd_rt_route_t *route = nd_rt_find_route(tgt, rule->table);
-
-        if (!route || route->oif == rule->proxy->iface->index || !(session->iface = nd_iface_open(NULL, route->oif))) {
-            session->state = ND_STATE_INVALID;
-            return session;
-        }
+        if (route && route->oif != rule->proxy->iface->index && (session->iface = nd_iface_open(NULL, route->oif)))
+            session->state = ND_STATE_INCOMPLETE;
     } else if ((session->iface = rule->iface)) {
         session->iface->refcount++;
-    }
-
-    if (session->iface) {
         session->state = ND_STATE_INCOMPLETE;
         session->ons_count = 1;
         session->ons_time = nd_current_time;
@@ -171,6 +162,7 @@ void nd_session_update(nd_session_t *session)
         if (nd_current_time - session->ons_time < nd_conf_retrans_time)
             break;
 
+        session->ons_time = nd_current_time;
         if (++session->ons_count > nd_conf_retrans_limit) {
             session->state = ND_STATE_INVALID;
             session->state_time = nd_current_time;
@@ -234,10 +226,10 @@ void nd_session_update(nd_session_t *session)
             // We will only retransmit if nd_conf_keepalive is true, or if the last incoming NS
             // request was made less than nd_conf_valid_ttl milliseconds ago.
 
-            if (!nd_conf_keepalive && nd_current_time - session->ins_time > nd_conf_valid_ttl)
+            if (!nd_conf_keepalive && nd_current_time - session->ins_time >= nd_conf_valid_ttl)
                 break;
 
-            long time = session->ons_count && !(session->ons_count % nd_conf_retrans_limit)
+            int64_t time = session->ons_count && !(session->ons_count % nd_conf_retrans_limit)
                             ? ((1 << session->ons_count / 3) * nd_conf_retrans_time)
                             : nd_conf_retrans_time;
 

@@ -38,9 +38,8 @@
 int nd_conf_invalid_ttl = 10000;
 int nd_conf_valid_ttl = 30000;
 int nd_conf_stale_ttl = 30000;
-int nd_conf_renew = 5000;
 int nd_conf_retrans_limit = 3;
-int nd_conf_retrans_time = 1000;
+int nd_conf_retrans_time = 1500;
 bool nd_conf_use_kernel = false;
 bool nd_conf_keepalive = false;
 
@@ -86,7 +85,6 @@ static const ndL_cfinfo_t ndL_cfinfo_table[] = {
     { "rewrite", NDL_RULE, NDL_NONE, 0, 0, 0, ndL_parse_rewrite },
     { "invalid-ttl", NDL_DEFAULT, NDL_INT, &nd_conf_invalid_ttl, 1000, 3600000, NULL },
     { "valid-ttl", NDL_DEFAULT, NDL_INT, &nd_conf_valid_ttl, 10000, 3600000, NULL },
-    { "renew", NDL_DEFAULT, NDL_INT, &nd_conf_renew, 0, 0, NULL },
     { "retrans-limit", NDL_DEFAULT, NDL_INT, &nd_conf_retrans_limit, 0, 10, NULL },
     { "retrans-time", NDL_DEFAULT, NDL_INT, &nd_conf_retrans_time, 0, 60000, NULL },
     { "keepalive", NDL_DEFAULT, NDL_BOOL, &nd_conf_keepalive, 0, 0, NULL },
